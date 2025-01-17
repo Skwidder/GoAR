@@ -3,17 +3,58 @@ class SmoothStoneDetector {
         this.gridSize = gridSize;
         this.historyLength = historyLength;
         this.emptyBoardColors = null;
+        this.scaleX = null;
+        this.scaleY = null;
         
         // Initialize history arrays for each intersection
         this.history = Array(gridSize).fill().map(() => 
             Array(gridSize).fill().map(() => ({
-                readings: [],         // Store recent detections
-                lastStable: null      // Last stable state
+                readings: [],
+                lastStable: null
             }))
         );
+
     }
 
-    // Calibrate by sampling empty board
+    samplePoint(ctx, point, radius = 10) {
+
+        const imageData = ctx.getImageData(
+            Math.round(point.x - radius),
+            Math.round(point.y - radius),
+            radius * 2,
+            radius * 2
+        );
+
+        // // Optional debug visualization
+        // const tempCanvas = document.createElement('canvas');
+        // tempCanvas.width = radius * 2;
+        // tempCanvas.height = radius * 2;
+        // const tempCtx = tempCanvas.getContext('2d');
+        // tempCtx.putImageData(imageData, 0, 0);
+
+        // console.log(`Sample at (${point.x}, ${point.y})`);
+        // console.log('%c ', `
+        //     font-size: 1px;
+        //     padding: ${radius * 2}px ${radius * 2}px;
+        //     background: url(${tempCanvas.toDataURL()}) no-repeat;
+        //     background-size: contain;
+        // `);
+
+        // Calculate brightness
+        let total = 0;
+        let count = 0;
+        for (let i = 0; i < imageData.data.length; i += 4) {
+            const r = imageData.data[i];
+            const g = imageData.data[i + 1];
+            const b = imageData.data[i + 2];
+            const brightness = (r + g + b) / 3;
+            total += brightness;
+            count++;
+        }
+
+        return total / count;
+    }
+
     calibrateEmpty(ctx, gridPoints) {
         this.emptyBoardColors = [];
         
@@ -25,34 +66,8 @@ class SmoothStoneDetector {
             }
             this.emptyBoardColors.push(row);
         }
-        console.log(this.emptyBoardColors);
     }
 
-    // Sample average brightness around a point
-    samplePoint(ctx, point, radius = 5) {
-        const imageData = ctx.getImageData(
-            point.x - radius, 
-            point.y - radius, 
-            radius * 2, 
-            radius * 2
-        );
-        console.log(point.x + "," + point.y);
-
-        let total = 0;
-        let count = 0;
-
-        for (let i = 0; i < imageData.data.length; i += 4) {
-            const r = imageData.data[i];
-            const g = imageData.data[i + 1];
-            const b = imageData.data[i + 2];
-            const brightness = (r + g + b) / 3;
-            total += brightness;
-            count++;
-        }
-        return total / count;
-    }
-
-    // Update history with new readings
     updateReadings(ctx, gridPoints) {
         const timestamp = Date.now();
 
@@ -62,8 +77,8 @@ class SmoothStoneDetector {
                 const emptyBrightness = this.emptyBoardColors[y][x];
                 const difference = currentBrightness - emptyBrightness;
 
-                console.log(x + "," + y +": " + difference + ":" + emptyBrightness + ":" + currentBrightness);
-                // Determine stone color and confidence
+                // console.log(x + "," + y +": " + difference + ":" + emptyBrightness + ":" + currentBrightness);
+
                 let reading = {
                     timestamp,
                     brightness: currentBrightness,
@@ -72,21 +87,19 @@ class SmoothStoneDetector {
                     confidence: 0
                 };
 
-                if (difference < -30) {  // Likely black stone
+                if (difference < -30) {
                     reading.stone = 'B';
                     reading.confidence = Math.min(1, Math.abs(difference) / 50);
-                } else if (difference > 30) {  // Likely white stone
+                } else if (difference > 30) {
                     reading.stone = 'W';
                     reading.confidence = Math.min(1, Math.abs(difference) / 50);
-                } else {  // Likely empty
+                } else {
                     reading.stone = null;
                     reading.confidence = 1 - (Math.abs(difference) / 30);
                 }
 
-                // Add to history
                 this.history[y][x].readings.push(reading);
                 
-                // Keep only recent readings
                 if (this.history[y][x].readings.length > this.historyLength) {
                     this.history[y][x].readings.shift();
                 }
@@ -94,10 +107,8 @@ class SmoothStoneDetector {
         }
     }
 
-    // Get the smoothed state of the board
     getSmoothedState() {
         const state = [];
-
         for (let y = 0; y < this.gridSize; y++) {
             const row = [];
             for (let x = 0; x < this.gridSize; x++) {
@@ -109,29 +120,25 @@ class SmoothStoneDetector {
         return state;
     }
 
-    // Analyze history for a single intersection
     getIntersectionState(y, x) {
         const readings = this.history[y][x].readings;
         if (readings.length === 0) return null;
 
-        // Count weighted votes for each state
         const votes = {
             'B': 0,
             'W': 0,
             'null': 0
         };
 
-        // Weight recent readings more heavily
         readings.forEach((reading, index) => {
-            const recency = (index + 1) / readings.length;  // 0-1, higher for more recent
+            const recency = (index + 1) / readings.length;
             const weight = reading.confidence * recency;
             const key = reading.stone === null ? 'null' : reading.stone;
             votes[key] += weight;
         });
 
-
         const total = votes.B + votes.W + votes.null;
-        const threshold = 0.6;  // 60% confidence required
+        const threshold = 0.6;
 
         if (votes.B / total > threshold) {
             this.history[y][x].lastStable = 'B';
@@ -144,13 +151,11 @@ class SmoothStoneDetector {
             return null;
         }
 
-        // If no clear winner, return last stable state
         return this.history[y][x].lastStable;
     }
 
-    // Debug visualization
     drawDebug(ctx, gridPoints) {
-        const radius = 5;
+        const radius = 10;
         
         for (let y = 0; y < this.gridSize; y++) {
             for (let x = 0; x < this.gridSize; x++) {
@@ -160,7 +165,6 @@ class SmoothStoneDetector {
                 
                 if (!current) continue;
 
-                // Draw sample area
                 ctx.strokeStyle = current.stone === 'B' ? 'red' : 
                                 current.stone === 'W' ? 'blue' : 
                                 'green';
@@ -172,7 +176,6 @@ class SmoothStoneDetector {
                     radius * 2
                 );
                 
-                // Show confidence value
                 ctx.fillStyle = 'yellow';
                 ctx.font = '10px Arial';
                 ctx.fillText(

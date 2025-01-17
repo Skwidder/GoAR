@@ -8,7 +8,6 @@ let cvLoading = false;
 
 async function initializeCamera() {
     try {
-
         const stream = await navigator.mediaDevices.getUserMedia({ 
             video: { 
                 width: { ideal: 1920 },
@@ -22,28 +21,111 @@ async function initializeCamera() {
 
         await new Promise(resolve => videoElement.onloadedmetadata = resolve);
 
+        // Calculate size that maintains aspect ratio
+        const videoAspect = videoElement.videoWidth / videoElement.videoHeight;
+        const containerRect = videoElement.getBoundingClientRect();
+        const containerAspect = containerRect.width / containerRect.height;
+
+        let displayWidth, displayHeight;
+
+        if (containerAspect > videoAspect) {
+            // Container is wider than video
+            displayHeight = containerRect.height;
+            displayWidth = displayHeight * videoAspect;
+        } else {
+            // Container is taller than video
+            displayWidth = containerRect.width;
+            displayHeight = displayWidth / videoAspect;
+        }
+
+        // Round to whole pixels
+        displayWidth = Math.round(displayWidth);
+        displayHeight = Math.round(displayHeight);
+
+        // Set all canvases to match the calculated size
         const videoCanvas = document.createElement('canvas');
-        videoCanvas.width = videoElement.videoWidth;
-        videoCanvas.height = videoElement.videoHeight;
+        videoCanvas.width = displayWidth;
+        videoCanvas.height = displayHeight;
         videoContext = videoCanvas.getContext('2d');
+
+        overlay = document.getElementById('overlay');
+        overlay.width = displayWidth;
+        overlay.height = displayHeight;
+        ctx = overlay.getContext('2d');
+
+        // Center the video and overlay in the container
+        const commonStyle = `
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: ${displayWidth}px;
+            height: ${displayHeight}px;
+        `;
+        videoElement.style.cssText = commonStyle;
+        overlay.style.cssText = commonStyle;
 
         // Start frame capture loop
         function captureFrame() {
-            videoContext.drawImage(videoElement, 0, 0, videoCanvas.width, videoCanvas.height);
+            videoContext.drawImage(videoElement, 0, 0, displayWidth, displayHeight);
             requestAnimationFrame(captureFrame);
         }
         captureFrame();
 
         console.log('Canvas dimensions:', {
-            width: videoContext.canvas.width,
-            height: videoContext.canvas.height
+            displaySize: {
+                width: displayWidth,
+                height: displayHeight,
+                aspect: displayWidth / displayHeight
+            },
+            video: {
+                width: videoElement.videoWidth,
+                height: videoElement.videoHeight,
+                aspect: videoAspect
+            }
         });
 
-        // Set up overlay canvas
-        overlay = document.getElementById('overlay');
-        ctx = overlay.getContext('2d');
-        
-        setupResizeHandling();
+        // Update sizes when window is resized
+        window.addEventListener('resize', () => {
+            const newContainerRect = videoElement.getBoundingClientRect();
+            
+            // Recalculate size maintaining aspect ratio
+            let newWidth, newHeight;
+            if (newContainerRect.width / newContainerRect.height > videoAspect) {
+                newHeight = newContainerRect.height;
+                newWidth = newHeight * videoAspect;
+            } else {
+                newWidth = newContainerRect.width;
+                newHeight = newWidth / videoAspect;
+            }
+
+            newWidth = Math.round(newWidth);
+            newHeight = Math.round(newHeight);
+
+            // Update canvas sizes
+            videoCanvas.width = newWidth;
+            videoCanvas.height = newHeight;
+            overlay.width = newWidth;
+            overlay.height = newHeight;
+
+            // Update styles
+            const newStyle = `
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                transform: translate(-50%, -50%);
+                width: ${newWidth}px;
+                height: ${newHeight}px;
+            `;
+            videoElement.style.cssText = newStyle;
+            overlay.style.cssText = newStyle;
+
+            // Redraw the board if needed
+            if (corners.length === 4) {
+                drawBoard();
+            }
+        });
+
         setupBoardControls();
         setupCornerSelection();
         stoneDetec = new SmoothStoneDetector();
@@ -53,12 +135,25 @@ async function initializeCamera() {
     }
 }
 
-// Rest of your functions remain the same
+
 function setupResizeHandling() {
     const resizeCanvas = () => {
-        const videoRect = videoElement.getBoundingClientRect();
-        overlay.width = videoRect.width;
-        overlay.height = videoRect.height;
+    
+        const newRect = videoElement.getBoundingClientRect();
+        const newWidth = newRect.width;
+        const newHeight = newRect.height;
+
+        // Update all canvas sizes
+        videoCanvas.width = newWidth;
+        videoCanvas.height = newHeight;
+        overlay.width = newWidth;
+        overlay.height = newHeight;
+
+        // Redraw the board if needed
+        if (corners.length === 4) {
+            drawBoard();
+        }
+
     };
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
