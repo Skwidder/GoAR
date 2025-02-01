@@ -1,3 +1,6 @@
+const { OGSConnection } = require("./OGS.js");
+const {ReviewBoard} = require("./reviewBoard.js");
+
 let ctx;
 let corners = [];
 let videoElement;
@@ -128,7 +131,11 @@ async function initializeCamera() {
 
         setupBoardControls();
         setupCornerSelection();
+        const reviewConn = new OGSConnection(1402863);
+        const review = new ReviewBoard(reviewConn,19);
         stoneDetec = new SmoothStoneDetector();
+
+        review.on('Move',(reviewData) => updateBoard(reviewData));
 
     } catch (err) {
         console.error('Error accessing camera:', err);
@@ -304,10 +311,10 @@ function drawStone(x, y, color) {
         stoneSize
     );
     
-    if (color === 'black') {
+    if (color == 1) {
         gradient.addColorStop(0, '#666');
         gradient.addColorStop(1, '#000');
-    } else {
+    } else if(color == -1) {
         gradient.addColorStop(0, '#fff');
         gradient.addColorStop(1, '#ddd');
     }
@@ -316,9 +323,36 @@ function drawStone(x, y, color) {
     ctx.fill();
 }
 
-function updateBoard(gameState) {
-    // ... board update code ...
+function updateBoard(reviewData) {
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+    const grid = calculateGridPoints();
+    stoneDetec.updateReadings(videoContext, grid);
+    const boardState = stoneDetec.getSmoothedState();
+
+    console.log(boardState);
+    console.log(reviewData);
+
+    let backInTime = false;
+    for (let row = 0; row < 19; row++) {
+        for (let col = 0; col < 19; col++) {
+            if(boardState[row][col] == 0){
+                if (reviewData[row][col] == 0){
+                    continue;
+                }
+
+                drawStone(col,row,reviewData[row][col])
+            }else if(boardState[row][col] != reviewData[row][col]){
+                drawStone(col,row,reviewData[row][col])
+                backintime = false;
+            }
+        }
+    }
 }
+
+
+
+
 
 // Initialize everything when the start button is clicked
 document.getElementById('startCamera').addEventListener('click', initializeCamera);

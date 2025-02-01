@@ -142,13 +142,13 @@ class SmoothStoneDetector {
 
         if (votes.B / total > threshold) {
             this.history[y][x].lastStable = 'B';
-            return 'B';
+            return 1;
         } else if (votes.W / total > threshold) {
             this.history[y][x].lastStable = 'W';
-            return 'W';
+            return -1;
         } else if (votes.null / total > threshold) {
             this.history[y][x].lastStable = null;
-            return null;
+            return 0;
         }
 
         return this.history[y][x].lastStable;
