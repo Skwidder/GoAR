@@ -43,9 +43,9 @@
 <body>
     <div id="videoContainer">
         <video id="webcam" autoplay></video>
-        <canvas id="overlay"></canvas>
+        <canvas id="overlay" style="z-index: 100"></canvas>
     </div>
-    <div id="controls">
+    <div id="controls" style="z-index: 101">
         <button id="startCamera">Start Camera</button>
     </div>
 
@@ -53,7 +53,6 @@
     
     <!-- Load your scripts after -->
     <script src="https://docs.opencv.org/4.11.0/opencv.js"> </script>
-    <script src="./StoneDetector.js"></script>
-    <script src="./renderer.js"></script>
+    <script src="./main-renderer.js"></script>
 </body>
 </html>

@@ -76,25 +76,52 @@ class OGSConnection extends EventEmitter {
     
         if(data.m != null){
             parsed.moves = data.m;
+            this.emit('moves',parsed);
         }
     
         if(data.k != null){
             parsed.marks = data.k
         }
-    
-        if(data.pp != null){
-            parsed.pen = data.pp;
-            if(data.pen != null){
-                parsed.penColor = data.pen;
+
+
+        //pen
+        if(data.pp != null) {
+            // New position data
+            const position = {
+                x: data.pp[0],
+                y: data.pp[1]
+            };
+
+            // If we get a pen color, this is the start of a new stroke
+            if(data.pen != null) {
+                this.lastPosition = position;
+                this.activeColor = data.pen;
+            } else {
+                // Continue current stroke with relative position
+                if(this.lastPosition) {
+                    this.lastPosition = {
+                        x: this.lastPosition.x + position.x,
+                        y: this.lastPosition.y + position.y
+                    };
+                }
             }
+
+            // Emit the current pen position
+            this.emit('penPosition', {
+                position: this.lastPosition,
+                color: this.activeColor,
+                isNewStroke: data.pen != null
+            });
         }
     
-        if(data.clearpen != null){
-            parsed.clearpen = data.clearpen;
+        if(data.clearpen != null) {
+            this.lastPosition = null;
+            this.activeColor = null;
+            this.emit('clearPen');
         }
     
         //TODO: Modify functions to emit depending on marks or moves
-        this.emit('moves',parsed);
+
     }
 }
 

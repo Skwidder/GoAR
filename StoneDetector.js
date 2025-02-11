@@ -187,3 +187,5 @@ class SmoothStoneDetector {
         }
     }
 }
+
+module.exports = {SmoothStoneDetector};
